@@ -21,7 +21,7 @@ class AplicacionCircuito(PantallaBase):
     def __init__(self, root):
         super().__init__(root)
         self.root.attributes("-fullscreen", False)
-        self.configurar_ventana("Circuito Serie o Paralelo", geometry="800x600")
+        self.configurar_ventana("Circuito Serie o Paralelo", geometry="1080x800")
         self.root.bind("<Escape>", lambda e: self.root.destroy())
 
         self._filas: list[dict[str, object]] = []
@@ -32,7 +32,7 @@ class AplicacionCircuito(PantallaBase):
         self.crear_encabezado("🔌  CIRCUITO SERIE O PARALELO", "Resistores y capacitores")
 
         principal = self.crear_contenedor_principal()
-        izquierda = self.crear_columna_izquierda(principal, width=180)
+        izquierda = self.crear_columna_izquierda(principal, width=600)
         derecha = self.crear_columna_derecha(principal)
 
         self._crear_panel_entrada(izquierda)
