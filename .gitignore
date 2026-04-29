@@ -1,1 +1,11 @@
-__pycache__
+# Ignorar carpetas de cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignorar entornos virtuales
+.venv/
+env/
+
+# Ignorar archivos de configuración locales
+*.log
