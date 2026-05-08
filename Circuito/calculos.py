@@ -73,7 +73,12 @@ def _validar_valores(valores: List[float]) -> None:
 
 
 def resolver_circuito(tipo: str, conexion: str, fuente: float, valores: List[float]) -> ResultadoCircuito:
-    """Resuelve el circuito solicitado usando las ecuaciones correctas."""
+    """Resuelve el circuito solicitado usando una tabla de despacho.
+
+    Esta implementación evita ifs anidados definiendo una función
+    específica para cada combinación `(tipo, conexion)` y usando
+    un diccionario de despacho.
+    """
     tipo = tipo.strip().lower()
     conexion = conexion.strip().lower()
     _validar_valores(valores)
@@ -86,62 +91,77 @@ def resolver_circuito(tipo: str, conexion: str, fuente: float, valores: List[flo
     if conexion not in {"serie", "paralelo"}:
         raise ValueError("La conexión debe ser 'Serie' o 'Paralelo'.")
 
-    if tipo == "resistores" and conexion == "serie":
-        equivalente = sum(valores)
-        corriente = fuente / equivalente
-        voltajes = [corriente * r for r in valores]
+    def _resistores_serie(_tipo, _conexion, _fuente, _valores):
+        equivalente = sum(_valores)
+        corriente = _fuente / equivalente
+        voltajes = [corriente * r for r in _valores]
         return ResultadoCircuito(
-            tipo=tipo,
-            conexion=conexion,
-            fuente=fuente,
-            valores=valores,
+            tipo=_tipo,
+            conexion=_conexion,
+            fuente=_fuente,
+            valores=_valores,
             equivalente=equivalente,
             corriente_total=corriente,
             voltajes=voltajes,
         )
 
-    if tipo == "resistores" and conexion == "paralelo":
-        equivalente = 1.0 / sum(1.0 / r for r in valores)
-        corriente_total = fuente / equivalente
-        corrientes = [fuente / r for r in valores]
+    def _resistores_paralelo(_tipo, _conexion, _fuente, _valores):
+        equivalente = 1.0 / sum(1.0 / r for r in _valores)
+        corriente_total = _fuente / equivalente
+        corrientes = [_fuente / r for r in _valores]
         return ResultadoCircuito(
-            tipo=tipo,
-            conexion=conexion,
-            fuente=fuente,
-            valores=valores,
+            tipo=_tipo,
+            conexion=_conexion,
+            fuente=_fuente,
+            valores=_valores,
             equivalente=equivalente,
             corriente_total=corriente_total,
             corrientes=corrientes,
         )
 
-    if tipo == "capacitores" and conexion == "serie":
-        equivalente = 1.0 / sum(1.0 / c for c in valores)
-        carga = equivalente * fuente
-        voltajes = [carga / c for c in valores]
-        cargas = [carga for _ in valores]
+    def _capacitores_serie(_tipo, _conexion, _fuente, _valores):
+        equivalente = 1.0 / sum(1.0 / c for c in _valores)
+        carga = equivalente * _fuente
+        voltajes = [carga / c for c in _valores]
+        cargas = [carga for _ in _valores]
         return ResultadoCircuito(
-            tipo=tipo,
-            conexion=conexion,
-            fuente=fuente,
-            valores=valores,
+            tipo=_tipo,
+            conexion=_conexion,
+            fuente=_fuente,
+            valores=_valores,
             equivalente=equivalente,
             voltajes=voltajes,
             cargas=cargas,
             carga_total=carga,
         )
 
-    equivalente = sum(valores)
-    carga_total = equivalente * fuente
-    cargas = [c * fuente for c in valores]
-    return ResultadoCircuito(
-        tipo=tipo,
-        conexion=conexion,
-        fuente=fuente,
-        valores=valores,
-        equivalente=equivalente,
-        cargas=cargas,
-        carga_total=carga_total,
-    )
+    def _capacitores_paralelo(_tipo, _conexion, _fuente, _valores):
+        equivalente = sum(_valores)
+        carga_total = equivalente * _fuente
+        cargas = [c * _fuente for c in _valores]
+        return ResultadoCircuito(
+            tipo=_tipo,
+            conexion=_conexion,
+            fuente=_fuente,
+            valores=_valores,
+            equivalente=equivalente,
+            cargas=cargas,
+            carga_total=carga_total,
+        )
+
+    _DISPATCH = {
+        ("resistores", "serie"): _resistores_serie,
+        ("resistores", "paralelo"): _resistores_paralelo,
+        ("capacitores", "serie"): _capacitores_serie,
+        ("capacitores", "paralelo"): _capacitores_paralelo,
+    }
+
+    try:
+        calculador = _DISPATCH[(tipo, conexion)]
+    except KeyError:
+        raise ValueError(f"Combinación no soportada: {tipo!r}, {conexion!r}")
+
+    return calculador(tipo, conexion, fuente, valores)
 
 
 def formatear_si(valor: float, unidad: str = "") -> str:

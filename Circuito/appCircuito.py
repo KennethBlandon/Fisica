@@ -20,8 +20,8 @@ from .importadores import cargar_desde_archivo
 class AplicacionCircuito(PantallaBase):
     def __init__(self, root):
         super().__init__(root)
-        self.root.attributes("-fullscreen", False)
-        self.configurar_ventana("Circuito Serie o Paralelo", geometry="1080x800")
+        self.root.attributes("-fullscreen", True)
+        self.configurar_ventana("Circuito Serie o Paralelo", geometry="1280x720")
         self.root.bind("<Escape>", lambda e: self.root.destroy())
 
         self._filas: list[dict[str, object]] = []
@@ -189,6 +189,7 @@ class AplicacionCircuito(PantallaBase):
         lineas.append("")
 
         if tipo == "resistores" and conexion == "serie":
+            lineas.append("Ecuación: Req = R1 + R2 + ...")
             lineas.append(f"Resistencia equivalente: {formatear_si(resultado.equivalente, 'Ω')}")
             lineas.append(f"Corriente de la batería: {formatear_si(resultado.corriente_total or 0, 'A')}")
             lineas.append("Voltaje en cada resistor:")
@@ -196,6 +197,8 @@ class AplicacionCircuito(PantallaBase):
                 lineas.append(f"  R{indice}: {formatear_si(voltaje, 'V')}")
 
         elif tipo == "resistores" and conexion == "paralelo":
+            lineas.append("Ecuación: 1/Req = 1/R1 + 1/R2 + ...")
+            lineas.append("Entonces Req = (1/R1 + 1/R2 + ...)^-1")
             lineas.append(f"Resistencia equivalente: {formatear_si(resultado.equivalente, 'Ω')}")
             lineas.append(f"Corriente de la batería: {formatear_si(resultado.corriente_total or 0, 'A')}")
             lineas.append("Corriente en cada resistor:")
@@ -203,6 +206,8 @@ class AplicacionCircuito(PantallaBase):
                 lineas.append(f"  R{indice}: {formatear_si(corriente, 'A')}")
 
         elif tipo == "capacitores" and conexion == "serie":
+            lineas.append("Ecuación: 1/Ceq = 1/C1 + 1/C2 + ...")
+            lineas.append("Entonces Ceq = (1/C1 + 1/C2 + ...)^-1")
             lineas.append(f"Capacitancia equivalente: {formatear_si(resultado.equivalente, 'F')}")
             lineas.append(f"Carga en cada capacitor: {formatear_si(resultado.carga_total or 0, 'C')}")
             lineas.append("Voltaje en cada capacitor:")
@@ -210,6 +215,7 @@ class AplicacionCircuito(PantallaBase):
                 lineas.append(f"  C{indice}: {formatear_si(voltaje, 'V')}")
 
         else:
+            lineas.append("Ecuación: Ceq = C1 + C2 + ...")
             lineas.append(f"Capacitancia equivalente: {formatear_si(resultado.equivalente, 'F')}")
             lineas.append(f"Carga total: {formatear_si(resultado.carga_total or 0, 'C')}")
             lineas.append("Carga en cada capacitor:")
@@ -217,6 +223,8 @@ class AplicacionCircuito(PantallaBase):
                 lineas.append(f"  C{indice}: {formatear_si(carga, 'C')}")
 
         self._escribir_salida("\n".join(lineas))
+
+ 
 
     def _escribir_salida(self, texto):
         self.texto.config(state="normal")
