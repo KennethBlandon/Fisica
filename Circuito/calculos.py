@@ -73,12 +73,8 @@ def _validar_valores(valores: List[float]) -> None:
 
 
 def resolver_circuito(tipo: str, conexion: str, fuente: float, valores: List[float]) -> ResultadoCircuito:
-    """Resuelve el circuito solicitado usando una tabla de despacho.
+    """Resuelve el circuito solicitado usando una tabla de despacho."""
 
-    Esta implementación evita ifs anidados definiendo una función
-    específica para cada combinación `(tipo, conexion)` y usando
-    un diccionario de despacho.
-    """
     tipo = tipo.strip().lower()
     conexion = conexion.strip().lower()
     _validar_valores(valores)

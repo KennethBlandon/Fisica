@@ -25,6 +25,12 @@ class AplicacionCircuito(PantallaBase):
         self.root.bind("<Escape>", lambda e: self.root.destroy())
 
         self._filas: list[dict[str, object]] = []
+        self._generadores_resultado = {
+            ("resistores", "serie"): self._lineas_resistores_serie,
+            ("resistores", "paralelo"): self._lineas_resistores_paralelo,
+            ("capacitores", "serie"): self._lineas_capacitores_serie,
+            ("capacitores", "paralelo"): self._lineas_capacitores_paralelo,
+        }
         self._construir_interfaz()
         
 
@@ -180,49 +186,67 @@ class AplicacionCircuito(PantallaBase):
             messagebox.showerror("Error en circuito", str(exc))
 
     def _mostrar_resultado(self, resultado):
-        tipo = resultado.tipo
-        conexion = resultado.conexion
-        lineas = []
-        lineas.append(f"Tipo: {tipo.title()}")
-        lineas.append(f"Conexión: {conexion.title()}")
-        lineas.append(f"Batería: {formatear_si(resultado.fuente, 'V')}")
-        lineas.append("")
-
-        if tipo == "resistores" and conexion == "serie":
-            lineas.append("Ecuación: Req = R1 + R2 + ...")
-            lineas.append(f"Resistencia equivalente: {formatear_si(resultado.equivalente, 'Ω')}")
-            lineas.append(f"Corriente de la batería: {formatear_si(resultado.corriente_total or 0, 'A')}")
-            lineas.append("Voltaje en cada resistor:")
-            for indice, voltaje in enumerate(resultado.voltajes or [], start=1):
-                lineas.append(f"  R{indice}: {formatear_si(voltaje, 'V')}")
-
-        elif tipo == "resistores" and conexion == "paralelo":
-            lineas.append("Ecuación: 1/Req = 1/R1 + 1/R2 + ...")
-            lineas.append("Entonces Req = (1/R1 + 1/R2 + ...)^-1")
-            lineas.append(f"Resistencia equivalente: {formatear_si(resultado.equivalente, 'Ω')}")
-            lineas.append(f"Corriente de la batería: {formatear_si(resultado.corriente_total or 0, 'A')}")
-            lineas.append("Corriente en cada resistor:")
-            for indice, corriente in enumerate(resultado.corrientes or [], start=1):
-                lineas.append(f"  R{indice}: {formatear_si(corriente, 'A')}")
-
-        elif tipo == "capacitores" and conexion == "serie":
-            lineas.append("Ecuación: 1/Ceq = 1/C1 + 1/C2 + ...")
-            lineas.append("Entonces Ceq = (1/C1 + 1/C2 + ...)^-1")
-            lineas.append(f"Capacitancia equivalente: {formatear_si(resultado.equivalente, 'F')}")
-            lineas.append(f"Carga en cada capacitor: {formatear_si(resultado.carga_total or 0, 'C')}")
-            lineas.append("Voltaje en cada capacitor:")
-            for indice, voltaje in enumerate(resultado.voltajes or [], start=1):
-                lineas.append(f"  C{indice}: {formatear_si(voltaje, 'V')}")
-
-        else:
-            lineas.append("Ecuación: Ceq = C1 + C2 + ...")
-            lineas.append(f"Capacitancia equivalente: {formatear_si(resultado.equivalente, 'F')}")
-            lineas.append(f"Carga total: {formatear_si(resultado.carga_total or 0, 'C')}")
-            lineas.append("Carga en cada capacitor:")
-            for indice, carga in enumerate(resultado.cargas or [], start=1):
-                lineas.append(f"  C{indice}: {formatear_si(carga, 'C')}")
-
+        lineas = self._lineas_resultado(resultado)
         self._escribir_salida("\n".join(lineas))
+
+    def _lineas_resultado(self, resultado):
+        lineas = [
+            f"Tipo: {resultado.tipo.title()}",
+            f"Conexión: {resultado.conexion.title()}",
+            f"Batería: {formatear_si(resultado.fuente, 'V')}",
+            "",
+        ]
+        generador = self._generadores_resultado.get((resultado.tipo, resultado.conexion))
+        if generador is None:
+            raise ValueError(f"Combinación no soportada: {resultado.tipo!r}, {resultado.conexion!r}")
+        lineas.extend(generador(resultado))
+        return lineas
+
+    def _lineas_resistores_serie(self, resultado):
+        lineas = [
+            "Ecuación: Req = R1 + R2 + ...",
+            f"Resistencia equivalente: {formatear_si(resultado.equivalente, 'Ω')}",
+            f"Corriente de la batería: {formatear_si(resultado.corriente_total or 0, 'A')}",
+            "Voltaje en cada resistor:",
+        ]
+        for indice, voltaje in enumerate(resultado.voltajes or [], start=1):
+            lineas.append(f"  R{indice}: {formatear_si(voltaje, 'V')}")
+        return lineas
+
+    def _lineas_resistores_paralelo(self, resultado):
+        lineas = [
+            "Ecuación: 1/Req = 1/R1 + 1/R2 + ...",
+            "Entonces Req = (1/R1 + 1/R2 + ...)^-1",
+            f"Resistencia equivalente: {formatear_si(resultado.equivalente, 'Ω')}",
+            f"Corriente de la batería: {formatear_si(resultado.corriente_total or 0, 'A')}",
+            "Corriente en cada resistor:",
+        ]
+        for indice, corriente in enumerate(resultado.corrientes or [], start=1):
+            lineas.append(f"  R{indice}: {formatear_si(corriente, 'A')}")
+        return lineas
+
+    def _lineas_capacitores_serie(self, resultado):
+        lineas = [
+            "Ecuación: 1/Ceq = 1/C1 + 1/C2 + ...",
+            "Entonces Ceq = (1/C1 + 1/C2 + ...)^-1",
+            f"Capacitancia equivalente: {formatear_si(resultado.equivalente, 'F')}",
+            f"Carga en cada capacitor: {formatear_si(resultado.carga_total or 0, 'C')}",
+            "Voltaje en cada capacitor:",
+        ]
+        for indice, voltaje in enumerate(resultado.voltajes or [], start=1):
+            lineas.append(f"  C{indice}: {formatear_si(voltaje, 'V')}")
+        return lineas
+
+    def _lineas_capacitores_paralelo(self, resultado):
+        lineas = [
+            "Ecuación: Ceq = C1 + C2 + ...",
+            f"Capacitancia equivalente: {formatear_si(resultado.equivalente, 'F')}",
+            f"Carga total: {formatear_si(resultado.carga_total or 0, 'C')}",
+            "Carga en cada capacitor:",
+        ]
+        for indice, carga in enumerate(resultado.cargas or [], start=1):
+            lineas.append(f"  C{indice}: {formatear_si(carga, 'C')}")
+        return lineas
 
  
 
