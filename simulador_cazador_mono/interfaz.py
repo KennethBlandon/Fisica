@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from estilos import Fuentes, PaletaAzul
+from logica_experimento import calcular_datos_experimento
 from validaciones import leer_y_validar_datos
 
 
@@ -9,6 +10,7 @@ class InterfazExperimento:
     def __init__(self, ventana_principal):
         self.ventana_principal = ventana_principal
         self.campos_entrada = {}
+        self.etiquetas_resultado = {}
 
         self.configurar_ventana()
         self.configurar_estilos_ttk()
@@ -300,12 +302,14 @@ class InterfazExperimento:
         panel_resultados.columnconfigure(0, weight=1)
         panel_resultados.columnconfigure(1, weight=1)
         panel_resultados.columnconfigure(2, weight=1)
+        panel_resultados.columnconfigure(3, weight=1)
 
-        self.crear_tarjeta_resultado(panel_resultados, 0, "Tiempo", "-- s")
-        self.crear_tarjeta_resultado(panel_resultados, 1, "Altura de choque", "-- m")
-        self.crear_tarjeta_resultado(panel_resultados, 2, "Estado", "--")
+        self.crear_tarjeta_resultado(panel_resultados, 0, "Ángulo", "-- °", "angulo")
+        self.crear_tarjeta_resultado(panel_resultados, 1, "Tiempo", "-- s", "tiempo")
+        self.crear_tarjeta_resultado(panel_resultados, 2, "Altura de choque", "-- m", "altura")
+        self.crear_tarjeta_resultado(panel_resultados, 3, "Estado", "--", "estado")
 
-    def crear_tarjeta_resultado(self, panel_resultados, columna, titulo, valor):
+    def crear_tarjeta_resultado(self, panel_resultados, columna, titulo, valor, clave_resultado):
         tarjeta = tk.Frame(
             panel_resultados,
             bg=PaletaAzul.FONDO_PANEL_SECUNDARIO,
@@ -331,6 +335,8 @@ class InterfazExperimento:
             fg=PaletaAzul.TEXTO_PRINCIPAL,
         )
         etiqueta_valor.pack(anchor="w", padx=12, pady=(0, 10))
+
+        self.etiquetas_resultado[clave_resultado] = etiqueta_valor
 
     def redibujar_escena(self, evento_redimension):
         self.dibujar_escena()
@@ -699,20 +705,23 @@ class InterfazExperimento:
     def simular(self):
         try:
             datos_experimento = leer_y_validar_datos(self.campos_entrada)
+            datos_calculados = calcular_datos_experimento(datos_experimento)
         except ValueError as error:
             messagebox.showerror("Datos inválidos", str(error))
             return
 
-        mensaje_datos = (
-            f"Datos válidos:\n\n"
-            f"X lanzador: {datos_experimento['posicion_x_lanzador']} m\n"
-            f"Altura lanzador: {datos_experimento['altura_lanzador']} m\n"
-            f"X mono: {datos_experimento['posicion_x_mono']} m\n"
-            f"Altura mono: {datos_experimento['altura_mono']} m\n"
-            f"Velocidad inicial: {datos_experimento['velocidad_inicial']} m/s"
+        self.etiquetas_resultado["angulo"].configure(
+            text=f"{datos_calculados['angulo_grados']:.2f} °"
         )
-
-        messagebox.showinfo("Validación correcta", mensaje_datos)
+        self.etiquetas_resultado["tiempo"].configure(
+            text=f"{datos_calculados['tiempo_choque']:.2f} s"
+        )
+        self.etiquetas_resultado["altura"].configure(
+            text=f"{datos_calculados['altura_choque']:.2f} m"
+        )
+        self.etiquetas_resultado["estado"].configure(
+            text=datos_calculados["estado"]
+        )
 
     def cerrar_aplicacion(self):
         self.ventana_principal.destroy()
