@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from estilos import Fuentes, PaletaAzul
+from validaciones import leer_y_validar_datos
 
 
 class InterfazExperimento:
@@ -696,7 +697,22 @@ class InterfazExperimento:
         )
 
     def simular(self):
-        pass
+        try:
+            datos_experimento = leer_y_validar_datos(self.campos_entrada)
+        except ValueError as error:
+            messagebox.showerror("Datos inválidos", str(error))
+            return
+
+        mensaje_datos = (
+            f"Datos válidos:\n\n"
+            f"X lanzador: {datos_experimento['posicion_x_lanzador']} m\n"
+            f"Altura lanzador: {datos_experimento['altura_lanzador']} m\n"
+            f"X mono: {datos_experimento['posicion_x_mono']} m\n"
+            f"Altura mono: {datos_experimento['altura_mono']} m\n"
+            f"Velocidad inicial: {datos_experimento['velocidad_inicial']} m/s"
+        )
+
+        messagebox.showinfo("Validación correcta", mensaje_datos)
 
     def cerrar_aplicacion(self):
         self.ventana_principal.destroy()
