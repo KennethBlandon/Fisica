@@ -13,6 +13,10 @@ class InterfazExperimento:
         self.etiquetas_resultado = {}
         self.simulacion_actual = None
 
+        self.indice_animacion = 0
+        self.tarea_animacion = None
+        self.velocidad_animacion_ms = 25
+
         self.configurar_ventana()
         self.configurar_estilos_ttk()
         self.construir_interfaz()
@@ -259,7 +263,7 @@ class InterfazExperimento:
             panel_botones,
             text="Reiniciar",
             style="BotonSecundario.TButton",
-            command=self.dibujar_escena,
+            command=self.reiniciar_escena,
         )
         boton_reiniciar.grid(row=1, column=0, sticky="ew")
 
@@ -307,7 +311,7 @@ class InterfazExperimento:
 
         self.crear_tarjeta_resultado(panel_resultados, 0, "Ángulo", "-- °", "angulo")
         self.crear_tarjeta_resultado(panel_resultados, 1, "Tiempo", "-- s", "tiempo")
-        self.crear_tarjeta_resultado(panel_resultados, 2, "Altura de choque", "-- m", "altura")
+        self.crear_tarjeta_resultado(panel_resultados, 2, "Punto de choque", "(--, --) m", "punto_choque")
         self.crear_tarjeta_resultado(panel_resultados, 3, "Estado", "--", "estado")
 
     def crear_tarjeta_resultado(self, panel_resultados, columna, titulo, valor, clave_resultado):
@@ -343,6 +347,10 @@ class InterfazExperimento:
         self.dibujar_escena()
 
     def dibujar_escena(self):
+        if self.simulacion_actual is not None:
+            self.dibujar_frame_animacion(self.indice_animacion)
+            return
+
         self.canvas_escena.delete("all")
 
         ancho_canvas = max(self.canvas_escena.winfo_width(), 800)
@@ -939,6 +947,267 @@ class InterfazExperimento:
             fill=PaletaAzul.AZUL_OSCURO,
         )
 
+
+    def reiniciar_escena(self):
+        self.detener_animacion()
+        self.simulacion_actual = None
+        self.indice_animacion = 0
+
+        self.etiquetas_resultado["angulo"].configure(text="-- °")
+        self.etiquetas_resultado["tiempo"].configure(text="-- s")
+        self.etiquetas_resultado["punto_choque"].configure(text="(--, --) m")
+        self.etiquetas_resultado["estado"].configure(text="--")
+
+        self.dibujar_escena()
+
+
+    def iniciar_animacion(self):
+        self.detener_animacion()
+        self.indice_animacion = 0
+        self.avanzar_animacion()
+
+
+    def avanzar_animacion(self):
+        if self.simulacion_actual is None:
+            return
+
+        puntos_proyectil = self.simulacion_actual["simulacion"]["puntos_proyectil"]
+
+        self.dibujar_frame_animacion(self.indice_animacion)
+
+        if self.indice_animacion < len(puntos_proyectil) - 1:
+            self.indice_animacion += 1
+            self.tarea_animacion = self.ventana_principal.after(
+                self.velocidad_animacion_ms,
+                self.avanzar_animacion,
+            )
+        else:
+            self.tarea_animacion = None
+
+
+    def detener_animacion(self):
+        if self.tarea_animacion is not None:
+            try:
+                self.ventana_principal.after_cancel(self.tarea_animacion)
+            except tk.TclError:
+                pass
+
+            self.tarea_animacion = None
+
+
+    def dibujar_frame_animacion(self, indice_animacion):
+        self.canvas_escena.delete("all")
+
+        ancho_canvas = max(self.canvas_escena.winfo_width(), 800)
+        alto_canvas = max(self.canvas_escena.winfo_height(), 460)
+
+        self.dibujar_fondo_escena(ancho_canvas, alto_canvas)
+
+        entradas = self.simulacion_actual["entradas"]
+        simulacion = self.simulacion_actual["simulacion"]
+
+        datos_calculados = simulacion["datos_calculados"]
+        puntos_proyectil = simulacion["puntos_proyectil"]
+        puntos_mono = simulacion["puntos_mono"]
+
+        transformacion = self.calcular_transformacion_escena(
+            ancho_canvas,
+            alto_canvas,
+            entradas,
+            puntos_proyectil,
+            puntos_mono,
+        )
+
+        posicion_lanzador_x, posicion_lanzador_y = self.convertir_a_canvas(
+            entradas["posicion_x_lanzador"],
+            entradas["altura_lanzador"],
+            transformacion,
+        )
+
+        posicion_mono_inicial_x, posicion_mono_inicial_y = self.convertir_a_canvas(
+            entradas["posicion_x_mono"],
+            entradas["altura_mono"],
+            transformacion,
+        )
+
+        posicion_choque_x, posicion_choque_y = self.convertir_a_canvas(
+            datos_calculados["posicion_x_choque"],
+            datos_calculados["altura_choque"],
+            transformacion,
+        )
+
+        indice_actual = min(indice_animacion, len(puntos_proyectil) - 1)
+
+        punto_proyectil_actual = puntos_proyectil[indice_actual]
+        punto_mono_actual = puntos_mono[indice_actual]
+
+        posicion_proyectil_x, posicion_proyectil_y = self.convertir_a_canvas(
+            punto_proyectil_actual["x"],
+            punto_proyectil_actual["y"],
+            transformacion,
+        )
+
+        posicion_mono_actual_x, posicion_mono_actual_y = self.convertir_a_canvas(
+            punto_mono_actual["x"],
+            punto_mono_actual["y"],
+            transformacion,
+        )
+
+        self.dibujar_lanzador(posicion_lanzador_x, posicion_lanzador_y)
+        self.dibujar_soporte_mono(posicion_mono_inicial_x, posicion_mono_inicial_y)
+
+        self.dibujar_linea_punteria(
+            posicion_lanzador_x,
+            posicion_lanzador_y,
+            posicion_mono_inicial_x,
+            posicion_mono_inicial_y,
+        )
+
+        self.dibujar_linea_recorrida(
+            puntos_proyectil[: indice_actual + 1],
+            transformacion,
+            PaletaAzul.AZUL_NEON,
+            4,
+            False,
+        )
+
+        self.dibujar_linea_recorrida(
+            puntos_mono[: indice_actual + 1],
+            transformacion,
+            "#326A91",
+            3,
+            True,
+        )
+
+        if datos_calculados["hay_choque_en_aire"]:
+            self.dibujar_punto_choque(posicion_choque_x, posicion_choque_y)
+
+        self.dibujar_proyectil_animado(posicion_proyectil_x, posicion_proyectil_y)
+        self.dibujar_mono_animado(posicion_mono_actual_x, posicion_mono_actual_y)
+
+        self.dibujar_etiquetas_calculadas(
+            posicion_lanzador_x,
+            posicion_lanzador_y,
+            posicion_mono_inicial_x,
+            posicion_mono_inicial_y,
+            posicion_choque_x,
+            posicion_choque_y,
+        )
+
+
+    def dibujar_linea_recorrida(
+        self,
+        puntos,
+        transformacion,
+        color_linea,
+        grosor_linea,
+        linea_punteada,
+    ):
+        puntos_canvas = []
+
+        for punto in puntos:
+            posicion_x_canvas, posicion_y_canvas = self.convertir_a_canvas(
+                punto["x"],
+                punto["y"],
+                transformacion,
+            )
+            puntos_canvas.append(posicion_x_canvas)
+            puntos_canvas.append(posicion_y_canvas)
+
+        if len(puntos_canvas) < 4:
+            return
+
+        if linea_punteada:
+            self.canvas_escena.create_line(
+                puntos_canvas,
+                fill=color_linea,
+                width=grosor_linea,
+                dash=(6, 8),
+                smooth=True,
+            )
+        else:
+            self.canvas_escena.create_line(
+                puntos_canvas,
+                fill=color_linea,
+                width=grosor_linea,
+                smooth=True,
+            )
+
+
+    def dibujar_soporte_mono(self, posicion_mono_x, posicion_mono_y):
+        self.canvas_escena.create_line(
+            posicion_mono_x,
+            posicion_mono_y - 70,
+            posicion_mono_x,
+            posicion_mono_y - 18,
+            fill="#0B1C2C",
+            width=3,
+        )
+
+        self.canvas_escena.create_rectangle(
+            posicion_mono_x - 58,
+            posicion_mono_y - 78,
+            posicion_mono_x + 58,
+            posicion_mono_y - 68,
+            fill="#123B63",
+            outline=PaletaAzul.AZUL_OSCURO,
+            width=2,
+        )
+
+
+    def dibujar_mono_animado(self, posicion_mono_x, posicion_mono_y):
+        self.canvas_escena.create_oval(
+            posicion_mono_x - 25,
+            posicion_mono_y - 25,
+            posicion_mono_x + 25,
+            posicion_mono_y + 25,
+            fill=PaletaAzul.ADVERTENCIA,
+            outline="#7A5A00",
+            width=2,
+        )
+
+        self.canvas_escena.create_oval(
+            posicion_mono_x - 10,
+            posicion_mono_y - 4,
+            posicion_mono_x - 4,
+            posicion_mono_y + 2,
+            fill="#3D2A00",
+            outline="",
+        )
+
+        self.canvas_escena.create_oval(
+            posicion_mono_x + 4,
+            posicion_mono_y - 4,
+            posicion_mono_x + 10,
+            posicion_mono_y + 2,
+            fill="#3D2A00",
+            outline="",
+        )
+
+        self.canvas_escena.create_arc(
+            posicion_mono_x - 10,
+            posicion_mono_y,
+            posicion_mono_x + 10,
+            posicion_mono_y + 14,
+            start=200,
+            extent=140,
+            style="arc",
+            outline="#3D2A00",
+            width=2,
+        )
+
+
+    def dibujar_proyectil_animado(self, posicion_proyectil_x, posicion_proyectil_y):
+        self.canvas_escena.create_oval(
+            posicion_proyectil_x - 8,
+            posicion_proyectil_y - 8,
+            posicion_proyectil_x + 8,
+            posicion_proyectil_y + 8,
+            fill=PaletaAzul.AZUL_OSCURO,
+            outline=PaletaAzul.AZUL_NEON,
+            width=2,
+        )
+
     def simular(self):
         try:
             datos_experimento = leer_y_validar_datos(self.campos_entrada)
@@ -960,14 +1229,15 @@ class InterfazExperimento:
         self.etiquetas_resultado["tiempo"].configure(
             text=f"{datos_calculados['tiempo_choque']:.2f} s"
         )
-        self.etiquetas_resultado["altura"].configure(
-            text=f"{datos_calculados['altura_choque']:.2f} m"
+        self.etiquetas_resultado["punto_choque"].configure(
+            text=f"({datos_calculados['posicion_x_choque']:.2f}, {datos_calculados['altura_choque']:.2f}) m"
         )
         self.etiquetas_resultado["estado"].configure(
             text=datos_calculados["estado"]
         )
 
-        self.dibujar_escena()
+        self.iniciar_animacion()
 
     def cerrar_aplicacion(self):
+        self.detener_animacion()
         self.ventana_principal.destroy()
