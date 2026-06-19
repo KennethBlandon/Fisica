@@ -24,9 +24,6 @@ Suposiciones del modelo:
 
 Ecuaciones usadas:
 
-- Ángulo de puntería hacia la posición inicial del mono:
-  $\theta = \operatorname{atan2}(y_m - y_l,\ x_m - x_l)$
-
 - Componentes de velocidad del proyectil:
   $v_x = v_0\cos\theta$, $v_y = v_0\sin\theta$
 
