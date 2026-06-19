@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from animacion import ControlAnimacion
 from estilos import Fuentes, PaletaAzul
 from logica_experimento import calcular_trayectoria_experimento
 from validaciones import leer_y_validar_datos
@@ -13,9 +14,7 @@ class InterfazExperimento:
         self.etiquetas_resultado = {}
         self.simulacion_actual = None
 
-        self.indice_animacion = 0
-        self.tarea_animacion = None
-        self.velocidad_animacion_ms = 25
+        self.control_animacion = ControlAnimacion(self.ventana_principal, velocidad_ms=25)
 
         self.configurar_ventana()
         self.configurar_estilos_ttk()
@@ -348,7 +347,7 @@ class InterfazExperimento:
 
     def dibujar_escena(self):
         if self.simulacion_actual is not None:
-            self.dibujar_frame_animacion(self.indice_animacion)
+            self.dibujar_frame_animacion(self.control_animacion.indice_actual)
             return
 
         self.canvas_escena.delete("all")
@@ -949,9 +948,9 @@ class InterfazExperimento:
 
 
     def reiniciar_escena(self):
-        self.detener_animacion()
+        self.control_animacion.detener()
+        self.control_animacion.reiniciar_indice()
         self.simulacion_actual = None
-        self.indice_animacion = 0
 
         self.etiquetas_resultado["angulo"].configure(text="-- °")
         self.etiquetas_resultado["tiempo"].configure(text="-- s")
@@ -959,40 +958,6 @@ class InterfazExperimento:
         self.etiquetas_resultado["estado"].configure(text="--")
 
         self.dibujar_escena()
-
-
-    def iniciar_animacion(self):
-        self.detener_animacion()
-        self.indice_animacion = 0
-        self.avanzar_animacion()
-
-
-    def avanzar_animacion(self):
-        if self.simulacion_actual is None:
-            return
-
-        puntos_proyectil = self.simulacion_actual["simulacion"]["puntos_proyectil"]
-
-        self.dibujar_frame_animacion(self.indice_animacion)
-
-        if self.indice_animacion < len(puntos_proyectil) - 1:
-            self.indice_animacion += 1
-            self.tarea_animacion = self.ventana_principal.after(
-                self.velocidad_animacion_ms,
-                self.avanzar_animacion,
-            )
-        else:
-            self.tarea_animacion = None
-
-
-    def detener_animacion(self):
-        if self.tarea_animacion is not None:
-            try:
-                self.ventana_principal.after_cancel(self.tarea_animacion)
-            except tk.TclError:
-                pass
-
-            self.tarea_animacion = None
 
 
     def dibujar_frame_animacion(self, indice_animacion):
@@ -1236,8 +1201,9 @@ class InterfazExperimento:
             text=datos_calculados["estado"]
         )
 
-        self.iniciar_animacion()
+        total_frames = len(simulacion["puntos_proyectil"])
+        self.control_animacion.iniciar(total_frames, self.dibujar_frame_animacion)
 
     def cerrar_aplicacion(self):
-        self.detener_animacion()
+        self.control_animacion.detener()
         self.ventana_principal.destroy()
