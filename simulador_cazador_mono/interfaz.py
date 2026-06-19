@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from estilos import Fuentes, PaletaAzul
-from logica_experimento import calcular_datos_experimento
+from logica_experimento import calcular_trayectoria_experimento
 from validaciones import leer_y_validar_datos
 
 
@@ -11,6 +11,7 @@ class InterfazExperimento:
         self.ventana_principal = ventana_principal
         self.campos_entrada = {}
         self.etiquetas_resultado = {}
+        self.simulacion_actual = None
 
         self.configurar_ventana()
         self.configurar_estilos_ttk()
@@ -403,39 +404,275 @@ class InterfazExperimento:
         )
 
     def dibujar_elementos_experimento(self, ancho_canvas, alto_canvas):
-        posicion_suelo_y = alto_canvas - 78
-        posicion_lanzador_x = 120
-        posicion_lanzador_y = posicion_suelo_y - 62
-        posicion_mono_x = ancho_canvas - 190
-        posicion_mono_y = max(95, alto_canvas * 0.28)
-        posicion_choque_y = posicion_mono_y + 118
+        if self.simulacion_actual is None:
+            self.canvas_escena.create_text(
+                ancho_canvas / 2,
+                alto_canvas / 2,
+                text="Ingrese los datos y presione Simular",
+                font=Fuentes.SECCION,
+                fill=PaletaAzul.TEXTO_OSCURO,
+            )
+            return
+
+        entradas = self.simulacion_actual["entradas"]
+        simulacion = self.simulacion_actual["simulacion"]
+
+        datos_calculados = simulacion["datos_calculados"]
+        puntos_proyectil = simulacion["puntos_proyectil"]
+        puntos_mono = simulacion["puntos_mono"]
+
+        transformacion = self.calcular_transformacion_escena(
+            ancho_canvas,
+            alto_canvas,
+            entradas,
+            puntos_proyectil,
+            puntos_mono,
+        )
+
+        posicion_lanzador_x, posicion_lanzador_y = self.convertir_a_canvas(
+            entradas["posicion_x_lanzador"],
+            entradas["altura_lanzador"],
+            transformacion,
+        )
+
+        posicion_mono_x, posicion_mono_y = self.convertir_a_canvas(
+            entradas["posicion_x_mono"],
+            entradas["altura_mono"],
+            transformacion,
+        )
+
+        posicion_choque_x, posicion_choque_y = self.convertir_a_canvas(
+            datos_calculados["posicion_x_choque"],
+            datos_calculados["altura_choque"],
+            transformacion,
+        )
 
         self.dibujar_lanzador(posicion_lanzador_x, posicion_lanzador_y)
         self.dibujar_mono_suspendido(posicion_mono_x, posicion_mono_y)
+
         self.dibujar_linea_punteria(
             posicion_lanzador_x,
             posicion_lanzador_y,
             posicion_mono_x,
             posicion_mono_y,
         )
-        self.dibujar_trayectoria_referencial(
-            posicion_lanzador_x,
-            posicion_lanzador_y,
-            posicion_mono_x,
-            posicion_choque_y,
-        )
-        self.dibujar_linea_caida_mono(
-            posicion_mono_x,
-            posicion_mono_y,
-            posicion_suelo_y,
-            posicion_choque_y,
-        )
-        self.dibujar_etiquetas_escena(
+
+        self.dibujar_trayectoria_calculada(puntos_proyectil, transformacion)
+        self.dibujar_caida_calculada(puntos_mono, transformacion)
+        self.dibujar_punto_choque(posicion_choque_x, posicion_choque_y)
+
+        self.dibujar_etiquetas_calculadas(
             posicion_lanzador_x,
             posicion_lanzador_y,
             posicion_mono_x,
             posicion_mono_y,
+            posicion_choque_x,
             posicion_choque_y,
+        )
+
+    def calcular_transformacion_escena(
+        self,
+        ancho_canvas,
+        alto_canvas,
+        entradas,
+        puntos_proyectil,
+        puntos_mono,
+    ):
+        margen_izquierdo = 70
+        margen_derecho = 70
+        margen_superior = 70
+        margen_inferior = 85
+
+        valores_x = [
+            entradas["posicion_x_lanzador"],
+            entradas["posicion_x_mono"],
+        ]
+
+        valores_y = [
+            0,
+            entradas["altura_lanzador"],
+            entradas["altura_mono"],
+        ]
+
+        for punto in puntos_proyectil:
+            valores_x.append(punto["x"])
+            valores_y.append(punto["y"])
+
+        for punto in puntos_mono:
+            valores_x.append(punto["x"])
+            valores_y.append(punto["y"])
+
+        minimo_x = min(valores_x)
+        maximo_x = max(valores_x)
+        maximo_y = max(valores_y)
+
+        rango_x = maximo_x - minimo_x
+
+        if rango_x == 0:
+            rango_x = 1
+
+        if maximo_y <= 0:
+            maximo_y = 1
+
+        return {
+            "margen_izquierdo": margen_izquierdo,
+            "margen_derecho": margen_derecho,
+            "margen_superior": margen_superior,
+            "margen_inferior": margen_inferior,
+            "minimo_x": minimo_x,
+            "rango_x": rango_x,
+            "maximo_y": maximo_y * 1.20,
+            "ancho_dibujo": ancho_canvas - margen_izquierdo - margen_derecho,
+            "alto_dibujo": alto_canvas - margen_superior - margen_inferior,
+            "suelo_y": alto_canvas - margen_inferior,
+        }
+
+    def convertir_a_canvas(self, posicion_x_real, posicion_y_real, transformacion):
+        proporcion_x = (
+            posicion_x_real - transformacion["minimo_x"]
+        ) / transformacion["rango_x"]
+
+        proporcion_y = posicion_y_real / transformacion["maximo_y"]
+
+        posicion_x_canvas = (
+            transformacion["margen_izquierdo"]
+            + proporcion_x * transformacion["ancho_dibujo"]
+        )
+
+        posicion_y_canvas = (
+            transformacion["suelo_y"]
+            - proporcion_y * transformacion["alto_dibujo"]
+        )
+
+        return posicion_x_canvas, posicion_y_canvas
+
+
+    def dibujar_trayectoria_calculada(self, puntos_proyectil, transformacion):
+        puntos_canvas = []
+
+        for punto in puntos_proyectil:
+            posicion_x_canvas, posicion_y_canvas = self.convertir_a_canvas(
+                punto["x"],
+                punto["y"],
+                transformacion,
+            )
+            puntos_canvas.append(posicion_x_canvas)
+            puntos_canvas.append(posicion_y_canvas)
+
+        self.canvas_escena.create_line(
+            puntos_canvas,
+            fill=PaletaAzul.AZUL_NEON,
+            width=4,
+            smooth=True,
+        )
+
+        for punto in puntos_proyectil[::10]:
+            posicion_x_canvas, posicion_y_canvas = self.convertir_a_canvas(
+                punto["x"],
+                punto["y"],
+                transformacion,
+            )
+
+            self.canvas_escena.create_oval(
+                posicion_x_canvas - 3,
+                posicion_y_canvas - 3,
+                posicion_x_canvas + 3,
+                posicion_y_canvas + 3,
+                fill=PaletaAzul.AZUL_OSCURO,
+                outline=PaletaAzul.AZUL_NEON,
+            )
+
+
+    def dibujar_caida_calculada(self, puntos_mono, transformacion):
+        puntos_canvas = []
+
+        for punto in puntos_mono:
+            posicion_x_canvas, posicion_y_canvas = self.convertir_a_canvas(
+                punto["x"],
+                punto["y"],
+                transformacion,
+            )
+            puntos_canvas.append(posicion_x_canvas)
+            puntos_canvas.append(posicion_y_canvas)
+
+        self.canvas_escena.create_line(
+            puntos_canvas,
+            fill="#326A91",
+            width=3,
+            dash=(6, 8),
+        )
+
+
+    def dibujar_punto_choque(self, posicion_choque_x, posicion_choque_y):
+        self.canvas_escena.create_oval(
+            posicion_choque_x - 28,
+            posicion_choque_y - 28,
+            posicion_choque_x + 28,
+            posicion_choque_y + 28,
+            outline=PaletaAzul.ADVERTENCIA,
+            width=3,
+        )
+
+        self.canvas_escena.create_oval(
+            posicion_choque_x - 39,
+            posicion_choque_y - 39,
+            posicion_choque_x + 39,
+            posicion_choque_y + 39,
+            outline=PaletaAzul.AZUL_NEON,
+            width=2,
+            dash=(4, 5),
+        )
+
+        self.canvas_escena.create_oval(
+            posicion_choque_x - 7,
+            posicion_choque_y - 7,
+            posicion_choque_x + 7,
+            posicion_choque_y + 7,
+            fill=PaletaAzul.AZUL_OSCURO,
+            outline=PaletaAzul.AZUL_NEON,
+            width=2,
+        )
+
+
+    def dibujar_etiquetas_calculadas(
+        self,
+        posicion_lanzador_x,
+        posicion_lanzador_y,
+        posicion_mono_x,
+        posicion_mono_y,
+        posicion_choque_x,
+        posicion_choque_y,
+    ):
+        self.canvas_escena.create_text(
+            posicion_lanzador_x,
+            posicion_lanzador_y + 78,
+            text="Lanzador",
+            font=Fuentes.TEXTO,
+            fill=PaletaAzul.TEXTO_OSCURO,
+        )
+
+        self.canvas_escena.create_text(
+            posicion_mono_x,
+            posicion_mono_y - 95,
+            text="Mono suspendido",
+            font=Fuentes.TEXTO,
+            fill=PaletaAzul.TEXTO_OSCURO,
+        )
+
+        self.canvas_escena.create_text(
+            posicion_choque_x,
+            posicion_choque_y + 52,
+            text="Choque",
+            font=Fuentes.TEXTO_PEQUENO,
+            fill=PaletaAzul.TEXTO_OSCURO,
+        )
+
+        self.canvas_escena.create_text(
+            (posicion_lanzador_x + posicion_mono_x) / 2,
+            (posicion_lanzador_y + posicion_mono_y) / 2 - 25,
+            text="Línea de puntería directa",
+            font=Fuentes.TEXTO_PEQUENO,
+            fill=PaletaAzul.AZUL_OSCURO,
         )
 
     def dibujar_lanzador(self, posicion_lanzador_x, posicion_lanzador_y):
@@ -705,10 +942,17 @@ class InterfazExperimento:
     def simular(self):
         try:
             datos_experimento = leer_y_validar_datos(self.campos_entrada)
-            datos_calculados = calcular_datos_experimento(datos_experimento)
+            simulacion = calcular_trayectoria_experimento(datos_experimento)
         except ValueError as error:
             messagebox.showerror("Datos inválidos", str(error))
             return
+
+        datos_calculados = simulacion["datos_calculados"]
+
+        self.simulacion_actual = {
+            "entradas": datos_experimento,
+            "simulacion": simulacion,
+        }
 
         self.etiquetas_resultado["angulo"].configure(
             text=f"{datos_calculados['angulo_grados']:.2f} °"
@@ -722,6 +966,8 @@ class InterfazExperimento:
         self.etiquetas_resultado["estado"].configure(
             text=datos_calculados["estado"]
         )
+
+        self.dibujar_escena()
 
     def cerrar_aplicacion(self):
         self.ventana_principal.destroy()
