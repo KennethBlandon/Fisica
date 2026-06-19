@@ -436,6 +436,8 @@ class InterfazExperimento:
             puntos_mono,
         )
 
+        self.dibujar_plano_cartesiano(transformacion)
+
         posicion_lanzador_x, posicion_lanzador_y = self.convertir_a_canvas(
             entradas["posicion_x_lanzador"],
             entradas["altura_lanzador"],
@@ -569,6 +571,125 @@ class InterfazExperimento:
         )
 
         return posicion_x_canvas, posicion_y_canvas
+
+    def dibujar_plano_cartesiano(self, transformacion):
+        limite_izquierdo = transformacion["margen_izquierdo"]
+        limite_derecho = limite_izquierdo + transformacion["ancho_dibujo"]
+        limite_superior = transformacion["margen_superior"]
+        limite_inferior = transformacion["suelo_y"]
+
+        _, posicion_y_cero = self.convertir_a_canvas(
+            transformacion["minimo_x"],
+            0,
+            transformacion,
+        )
+        posicion_x_cero, _ = self.convertir_a_canvas(
+            0,
+            0,
+            transformacion,
+        )
+
+        color_eje = "#1B5D89"
+        color_marca = "#2E7BAF"
+
+        if limite_superior <= posicion_y_cero <= limite_inferior:
+            self.canvas_escena.create_line(
+                limite_izquierdo,
+                posicion_y_cero,
+                limite_derecho,
+                posicion_y_cero,
+                fill=color_eje,
+                width=2,
+                arrow="last",
+            )
+
+            for indice in range(0, 6):
+                valor_x = transformacion["minimo_x"] + (transformacion["rango_x"] * indice / 5)
+                posicion_x_marca, _ = self.convertir_a_canvas(
+                    valor_x,
+                    0,
+                    transformacion,
+                )
+                self.canvas_escena.create_line(
+                    posicion_x_marca,
+                    posicion_y_cero - 5,
+                    posicion_x_marca,
+                    posicion_y_cero + 5,
+                    fill=color_marca,
+                    width=1,
+                )
+                self.canvas_escena.create_text(
+                    posicion_x_marca,
+                    posicion_y_cero + 16,
+                    text=f"{valor_x:.1f}",
+                    font=Fuentes.TEXTO_PEQUENO,
+                    fill=color_marca,
+                )
+
+            self.canvas_escena.create_text(
+                limite_derecho - 10,
+                posicion_y_cero - 12,
+                text="X",
+                font=Fuentes.TEXTO,
+                fill=color_eje,
+            )
+
+        if limite_izquierdo <= posicion_x_cero <= limite_derecho:
+            self.canvas_escena.create_line(
+                posicion_x_cero,
+                limite_inferior,
+                posicion_x_cero,
+                limite_superior,
+                fill=color_eje,
+                width=2,
+                arrow="last",
+            )
+
+            for indice in range(0, 6):
+                valor_y = (
+                    transformacion["minimo_y_visible"]
+                    + (transformacion["rango_y_visible"] * indice / 5)
+                )
+                _, posicion_y_marca = self.convertir_a_canvas(
+                    0,
+                    valor_y,
+                    transformacion,
+                )
+                self.canvas_escena.create_line(
+                    posicion_x_cero - 5,
+                    posicion_y_marca,
+                    posicion_x_cero + 5,
+                    posicion_y_marca,
+                    fill=color_marca,
+                    width=1,
+                )
+                self.canvas_escena.create_text(
+                    posicion_x_cero + 26,
+                    posicion_y_marca,
+                    text=f"{valor_y:.1f}",
+                    font=Fuentes.TEXTO_PEQUENO,
+                    fill=color_marca,
+                )
+
+            self.canvas_escena.create_text(
+                posicion_x_cero + 12,
+                limite_superior + 12,
+                text="Y",
+                font=Fuentes.TEXTO,
+                fill=color_eje,
+            )
+
+        if (
+            limite_izquierdo <= posicion_x_cero <= limite_derecho
+            and limite_superior <= posicion_y_cero <= limite_inferior
+        ):
+            self.canvas_escena.create_text(
+                posicion_x_cero + 28,
+                posicion_y_cero - 12,
+                text="(0,0)",
+                font=Fuentes.TEXTO_PEQUENO,
+                fill=color_eje,
+            )
 
 
     def dibujar_trayectoria_calculada(self, puntos_proyectil, transformacion):
@@ -1007,6 +1128,8 @@ class InterfazExperimento:
                 punto_mono_actual,
             ],
         )
+
+        self.dibujar_plano_cartesiano(transformacion)
 
         posicion_lanzador_x, posicion_lanzador_y = self.convertir_a_canvas(
             entradas["posicion_x_lanzador"],
