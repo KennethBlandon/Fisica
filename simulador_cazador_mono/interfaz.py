@@ -484,6 +484,7 @@ class InterfazExperimento:
         entradas,
         puntos_proyectil,
         puntos_mono,
+        puntos_seguimiento=None,
     ):
         margen_izquierdo = 70
         margen_derecho = 70
@@ -521,6 +522,19 @@ class InterfazExperimento:
         if maximo_y <= 0:
             maximo_y = 1
 
+        rango_y_visible = maximo_y * 1.20
+        minimo_y_visible = 0
+
+        if puntos_seguimiento:
+            minimo_seguimiento = min(
+                punto["y"]
+                for punto in puntos_seguimiento
+            )
+            margen_inferior_visible = rango_y_visible * 0.12
+
+            if minimo_seguimiento < (minimo_y_visible + margen_inferior_visible):
+                minimo_y_visible = minimo_seguimiento - margen_inferior_visible
+
         return {
             "margen_izquierdo": margen_izquierdo,
             "margen_derecho": margen_derecho,
@@ -528,7 +542,8 @@ class InterfazExperimento:
             "margen_inferior": margen_inferior,
             "minimo_x": minimo_x,
             "rango_x": rango_x,
-            "maximo_y": maximo_y * 1.20,
+            "minimo_y_visible": minimo_y_visible,
+            "rango_y_visible": rango_y_visible,
             "ancho_dibujo": ancho_canvas - margen_izquierdo - margen_derecho,
             "alto_dibujo": alto_canvas - margen_superior - margen_inferior,
             "suelo_y": alto_canvas - margen_inferior,
@@ -539,7 +554,9 @@ class InterfazExperimento:
             posicion_x_real - transformacion["minimo_x"]
         ) / transformacion["rango_x"]
 
-        proporcion_y = posicion_y_real / transformacion["maximo_y"]
+        proporcion_y = (
+            posicion_y_real - transformacion["minimo_y_visible"]
+        ) / transformacion["rango_y_visible"]
 
         posicion_x_canvas = (
             transformacion["margen_izquierdo"]
@@ -975,12 +992,20 @@ class InterfazExperimento:
         puntos_proyectil = simulacion["puntos_proyectil"]
         puntos_mono = simulacion["puntos_mono"]
 
+        indice_actual = min(indice_animacion, len(puntos_proyectil) - 1)
+        punto_proyectil_actual = puntos_proyectil[indice_actual]
+        punto_mono_actual = puntos_mono[indice_actual]
+
         transformacion = self.calcular_transformacion_escena(
             ancho_canvas,
             alto_canvas,
             entradas,
             puntos_proyectil,
             puntos_mono,
+            puntos_seguimiento=[
+                punto_proyectil_actual,
+                punto_mono_actual,
+            ],
         )
 
         posicion_lanzador_x, posicion_lanzador_y = self.convertir_a_canvas(
@@ -1000,11 +1025,6 @@ class InterfazExperimento:
             datos_calculados["altura_choque"],
             transformacion,
         )
-
-        indice_actual = min(indice_animacion, len(puntos_proyectil) - 1)
-
-        punto_proyectil_actual = puntos_proyectil[indice_actual]
-        punto_mono_actual = puntos_mono[indice_actual]
 
         posicion_proyectil_x, posicion_proyectil_y = self.convertir_a_canvas(
             punto_proyectil_actual["x"],
