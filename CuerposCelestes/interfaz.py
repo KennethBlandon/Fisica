@@ -32,7 +32,7 @@ class AppSimulador(tk.Tk):
         super().__init__()
         self.title("Simulador de cuerpos celestes 2D")
         self.geometry("1200x760")
-        self.minsize(980, 620)
+        self.minsize(800, 600)
         self.configure(bg=BG_APP)
 
         self.simulador = SimuladorNBody()
@@ -65,9 +65,56 @@ class AppSimulador(tk.Tk):
         self._cargar_ejemplo()
 
     def _crear_ui(self) -> None:
-        panel = tk.Frame(self, bg=BG_PANEL, width=340)
-        panel.pack(side=tk.LEFT, fill=tk.Y)
-        panel.pack_propagate(False)
+        panel_wrap = tk.Frame(self, bg=BG_PANEL, width=340)
+        panel_wrap.pack(side=tk.LEFT, fill=tk.Y)
+        panel_wrap.pack_propagate(False)
+
+        panel_scroll = tk.Scrollbar(panel_wrap, orient=tk.VERTICAL)
+        panel_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        panel_canvas = tk.Canvas(
+            panel_wrap,
+            bg=BG_PANEL,
+            highlightthickness=0,
+            relief=tk.FLAT,
+            yscrollcommand=panel_scroll.set,
+        )
+        panel_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        panel_scroll.config(command=panel_canvas.yview)
+
+        panel = tk.Frame(panel_canvas, bg=BG_PANEL)
+        panel_window = panel_canvas.create_window((0, 0), window=panel, anchor="nw")
+
+        panel.bind(
+            "<Configure>",
+            lambda _e: panel_canvas.configure(scrollregion=panel_canvas.bbox("all")),
+        )
+        panel_canvas.bind(
+            "<Configure>",
+            lambda e: panel_canvas.itemconfigure(panel_window, width=e.width),
+        )
+
+        def _scroll_panel(event: tk.Event) -> None:
+            if hasattr(event, "delta") and event.delta:
+                panel_canvas.yview_scroll(-int(event.delta / 120), "units")
+            elif hasattr(event, "num"):
+                if event.num == 4:
+                    panel_canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    panel_canvas.yview_scroll(1, "units")
+
+        def _activar_scroll(_event: tk.Event) -> None:
+            self.bind_all("<MouseWheel>", _scroll_panel)
+            self.bind_all("<Button-4>", _scroll_panel)
+            self.bind_all("<Button-5>", _scroll_panel)
+
+        def _desactivar_scroll(_event: tk.Event) -> None:
+            self.unbind_all("<MouseWheel>")
+            self.unbind_all("<Button-4>")
+            self.unbind_all("<Button-5>")
+
+        panel_canvas.bind("<Enter>", _activar_scroll)
+        panel_canvas.bind("<Leave>", _desactivar_scroll)
 
         canvas_wrap = tk.Frame(self, bg=BG_APP)
         canvas_wrap.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
