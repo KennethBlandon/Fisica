@@ -47,6 +47,7 @@ class SimuladorNBody:
     def __init__(self, g: float = 6.674e-11, dt: float = 3600.0, suavizado: float = 1e6) -> None:
         self.G = g
         self.dt = dt
+        self.dt_max_interno = 600.0
         self.suavizado = suavizado
         self.usar_retardo_gravitacional = False
         self.velocidad_gravedad = VELOCIDAD_LUZ
@@ -86,14 +87,29 @@ class SimuladorNBody:
     def paso(self, subpasos: int = 1) -> None:
         if len(self.cuerpos) < 1:
             return
-        for _ in range(max(1, subpasos)):
-            if self.usar_retardo_gravitacional:
-                self._integrar_con_retardo()
-            else:
-                self._integrar_velocity_verlet()
-            self.tiempo_total += self.dt
-            for cuerpo in self.cuerpos:
-                cuerpo.historial.append((self.tiempo_total, cuerpo.x, cuerpo.y))
+        pasos = max(1, subpasos)
+        dt_total = self.dt
+        dt_subpaso_usuario = dt_total / pasos
+        dt_max = max(1e-9, self.dt_max_interno)
+
+        for _ in range(pasos):
+            restante = dt_subpaso_usuario
+            while restante > 0.0:
+                dt_interno = min(restante, dt_max)
+                self.dt = dt_interno
+                if self.usar_retardo_gravitacional:
+                    self._integrar_con_retardo()
+                else:
+                    self._integrar_velocity_verlet()
+
+                self.tiempo_total += dt_interno
+                for cuerpo in self.cuerpos:
+                    cuerpo.historial.append((self.tiempo_total, cuerpo.x, cuerpo.y))
+
+                restante -= dt_interno
+
+        # Conserva el dt configurado por usuario para los siguientes ticks.
+        self.dt = dt_total
 
     def _calcular_aceleraciones(self) -> tuple[list[float], list[float]]:
         n = len(self.cuerpos)
